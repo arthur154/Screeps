@@ -76,16 +76,6 @@ function spawnCreeps(spawn) {
 	var creepsInSpawnRoom = spawn.room.find(FIND_MY_CREEPS);	
 	var harvestersInSpawnRoom = _.filter(creepsInSpawnRoom, (creep) => creep.memory.role === 'harvester');
 
-	// Emergency scenario - no harvesters and no ability to spawn a harvester
-	if (harvestersInSpawnRoom.length === 0 && spawn.room.energyCapacityAvailable < 200) {
-		if (spawn.memory.shouldSendNotifications) {
-			Game.notify(`No havesters in room ${spawn.room.name} and not enough energy to spawn!`);
-			spawn.memory.shouldSendNotifications = false;
-		}
-		console.log(`No havesters in room ${spawn.room.name} and not enough energy to spawn!`);
-		return;
-	}
-
 	// Target number of creeps based on spawn.room.controller.level
 	var targetCreepCounts = getTargetCreepCounts(spawn);
 	// console.log(`Target creep counts in room ${spawn.room.name} ${targetCreepCounts.harvester}  ${targetCreepCounts.upgrader}  ${targetCreepCounts.builder}`);
@@ -109,7 +99,7 @@ function spawnCreeps(spawn) {
 		console.log(`Started spawn for (name:${newName} role:${role} body:[${bodyParts}])`);
 	}
 	else if (spawnResult === ERR_NOT_ENOUGH_ENERGY) {
-		// console.log(`room:${spawn.room.name} energy:${spawn.room.energyAvailable}/${spawn.room.energyCapacityAvailable}`);
+		// console.log(`Failed to spawn role:${role} in room ${spawn.room.name} (energy:${spawn.room.energyAvailable}/${spawn.room.energyCapacityAvailable})`);
 		if (role === 'harvester') {
 			if (harvestersInSpawnRoom.length === 1) {
 				console.log(`WARN: Spawn harvester in room ${spawn.room.name} failed and there is not enough energy to create a second harvester`);
