@@ -4,40 +4,47 @@
 // TODO:
 // Should we have spawn roles? Spawns with minerals in the room? Multiple vs. 1 engery source? Etc.
 
-function getBodyParts(spawn, role) {
-	if (spawn.room.energyCapacityAvailable <= 300 && spawn.room.energyAvailable > 200) {
-		return [WORK,CARRY,MOVE]; // 200 cost
-	}
-	switch (role) {
-		case 'upgrader':
-			if (spawn.room.energyCapacityAvailable <= 550 && spawn.room.energyAvailable > 300) {
-				return [WORK,CARRY,CARRY,MOVE,MOVE]; // 300 cost
-			}
-			if (spawn.room.energyCapacityAvailable <= 800 && spawn.room.energyAvailable > 700) {
-				return [WORK,WORK,WORK,CARRY,CARRY,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE]; // 700 cost
-			}
-			break;
-		case 'harvester':
-			if (spawn.room.energyCapacityAvailable <= 550 && spawn.room.energyAvailable > 300) {
-				return [WORK,WORK,CARRY,CARRY,MOVE,MOVE]; // 300 cost
-			}
-			if (spawn.room.energyCapacityAvailable <= 800 && spawn.room.energyAvailable > 700) {
-				return [WORK,WORK,WORK,CARRY,CARRY,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE]; // 700 cost
-			}
-			break;
-		case 'builder':
-			if (spawn.room.energyCapacityAvailable <= 550 && spawn.room.energyAvailable > 300) {
-				return [WORK,CARRY,CARRY,MOVE,MOVE]; // 300 cost
-			}
-			if (spawn.room.energyCapacityAvailable <= 800 && spawn.room.energyAvailable > 700) {
-				return [WORK,WORK,WORK,CARRY,CARRY,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE]; // 700 cost
-			}
-			break;
-		default:
-			throw new Error('Role ' + role + ' not supported in manager.creep.getBodyParts');
+// TODO: Add function description
+function getWorkerBodyParts(spawn) {
+	// Target energy usage = 70% total energy capacity in the room
+	var targetEnergyUsage = spawn.room.energyCapacityAvailable * 0.7;
+
+	if (spawn.room.energyAvailable > targetEnergyUsage) {
+		targetEnergyUsage = spawn.room.energyAvailable;
 	}
 
-	// console.log(`Unsupportted energyCapacityAvailable ${spawn.room.energyCapacityAvailable} size in room ${spawn.room.name}`)
+	// The ideal base body parts are [WORK,CARRY,CARRY,MOVE,MOVE] which is 300 energy
+	var idealBaseBodyCount = Math.floor(targetEnergyUsage / 300);
+
+	var idealBaseBody = [];
+	if (idealBaseBodyCount > 0) {
+		idealBaseBody = [].concat(...Array(idealBaseBodyCount).fill([WORK,CARRY,CARRY,MOVE,MOVE]));
+	}
+
+	// Each extension built, provides 50 base engery
+	if (targetEnergyUsage % 300 >= 250) { 
+		// console.log(`${idealBaseBodyCount} base body parts with an additional [WORK,CARRY,CARRY,MOVE] body parts needed`);
+		return idealBaseBody.concat([WORK,CARRY,CARRY,MOVE]); 
+	}
+	if (targetEnergyUsage % 300 >= 200) { 
+		// console.log(`${idealBaseBodyCount} base body parts with an additional [WORK,CARRY,MOVE] body parts needed`);
+		return idealBaseBody.concat([WORK,CARRY,MOVE]); 
+	}
+	if (targetEnergyUsage % 300 >= 150) { 
+		// console.log(`${idealBaseBodyCount} base body parts with an additional [WORK,CARRY] body parts needed`);
+		return idealBaseBody.concat([WORK,CARRY]); 
+	}
+	if (targetEnergyUsage % 300 >= 100) { 
+		// console.log(`${idealBaseBodyCount} base body parts with an additional [WORK] body part needed`);
+		return idealBaseBody.concat([WORK]); 
+	}
+	if (targetEnergyUsage % 300 >= 50) { 
+		// console.log(`${idealBaseBodyCount} base body parts with an additional [CARRY] body part needed`);
+		return idealBaseBody.concat([CARRY]); 
+	}
+	
+	// console.log(`No additional body parts needed`);
+	return idealBaseBody;
 }
 
 function getTargetCreepCounts(spawn) {
@@ -54,9 +61,9 @@ function getTargetCreepCounts(spawn) {
 		case 6:
 		case 7:
 		case 8:
-			return { harvester: 2, upgrader: 3, builder: 3 };
+			return { harvester: 3, upgrader: 3, builder: 3 };
 		default:
-			throw new Error('Controller level ' + spawn.room.controller.level + ' not supported in manager.creep.getTargetCreepCounts');
+			throw new Error(`Controller level ${spawn.room.controller.level} not supported in manager.creep.getTargetCreepCounts`);
 	}
 }
 
@@ -66,8 +73,7 @@ function spawnCreeps(spawn) {
 		return;
 	}
 
-	var creepsInSpawnRoom = spawn.room.find(FIND_MY_CREEPS);
-	
+	var creepsInSpawnRoom = spawn.room.find(FIND_MY_CREEPS);	
 	var harvestersInSpawnRoom = _.filter(creepsInSpawnRoom, (creep) => creep.memory.role === 'harvester');
 
 	// Emergency scenario - no harvesters and no ability to spawn a harvester
@@ -84,26 +90,44 @@ function spawnCreeps(spawn) {
 	var targetCreepCounts = getTargetCreepCounts(spawn);
 	// console.log(`Target creep counts in room ${spawn.room.name} ${targetCreepCounts.harvester}  ${targetCreepCounts.upgrader}  ${targetCreepCounts.builder}`);
 
-	var bodyParts = undefined;
 	var role = undefined;
+	var bodyParts = getWorkerBodyParts(spawn);
 	if (harvestersInSpawnRoom.length < targetCreepCounts.harvester) {
 		role = 'harvester';
-		bodyParts = getBodyParts(spawn, role);
 	}
 	else if (_.filter(creepsInSpawnRoom, (creep) => creep.memory.role === 'upgrader').length < targetCreepCounts.upgrader) {
 		role = 'upgrader';
-		bodyParts = getBodyParts(spawn, role);
 	}
 	else if (_.filter(creepsInSpawnRoom, (creep) => creep.memory.role === 'builder').length < targetCreepCounts.builder) {
 		role = 'builder';
-		bodyParts = getBodyParts(spawn, role);
 	}
 
-	if (bodyParts) {
-	    var newName = role + Game.time;
-		var defaultMemory = {memory: {role: role}};
-		var spawnResult = spawn.spawnCreep(bodyParts, newName, defaultMemory);
-		console.log(`Spawn result ${spawnResult == 0 ? 'successful' : `unsuccessful (code: ${spawnResult})`} (name:${newName} role:${role} body:[${bodyParts}])`);
+	var newName = role + Game.time;
+	var defaultMemory = {memory: {role: role}};
+	var spawnResult = spawn.spawnCreep(bodyParts, newName, defaultMemory);
+	if (spawnResult === OK) {
+		console.log(`Started spawn for (name:${newName} role:${role} body:[${bodyParts}])`);
+	}
+	else if (spawnResult === ERR_NOT_ENOUGH_ENERGY) {
+		// console.log(`room:${spawn.room.name} energy:${spawn.room.energyAvailable}/${spawn.room.energyCapacityAvailable}`);
+		if (role === 'harvester') {
+			if (harvestersInSpawnRoom.length === 1) {
+				console.log(`WARN: Spawn harvester in room ${spawn.room.name} failed and there is not enough energy to create a second harvester`);
+			}
+			else if (harvestersInSpawnRoom.length === 0) {
+				// Panic
+				throw new Error(`Spawn harvester in room ${spawn.room.name} failed and there is not enough energy to create a harvester`);
+			}
+		}
+	}
+	else {
+		var spawnResultDesc = '?'
+		if (spawnResult === ERR_NOT_OWNER) { spawnResultDesc = 'ERR_NOT_OWNER'; }
+		else if (spawnResult === ERR_NAME_EXISTS) { spawnResultDesc = 'ERR_NAME_EXISTS'; }
+		else if (spawnResult === ERR_BUSY) { spawnResultDesc = 'ERR_BUSY'; }
+		else if (spawnResult === ERR_INVALID_ARGS) { spawnResultDesc = 'ERR_INVALID_ARGS'; }
+		else if (spawnResult === ERR_RCL_NOT_ENOUGH) { spawnResultDesc = 'ERR_RCL_NOT_ENOUGH'; }
+		throw new Error(`Spawn creep in room ${spawn.room.name} failed with spawnCreepResult: ${spawnResult} (${spawnResultDesc})`);
 	}
 }
 
