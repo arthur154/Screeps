@@ -61,7 +61,10 @@ function getTargetCreepCounts(spawn) {
 		case 6:
 		case 7:
 		case 8:
-			return { harvester: 3, upgrader: 3, builder: 3 };
+			// return { harvester: 3, upgrader: 3, builder: 3 };
+
+			// Temporary - we don't have anything to build rn
+			return { harvester: 4, upgrader: 3, builder: 0 };
 		default:
 			throw new Error(`Controller level ${spawn.room.controller.level} not supported in manager.creep.getTargetCreepCounts`);
 	}
@@ -90,6 +93,10 @@ function spawnCreeps(spawn) {
 	}
 	else if (_.filter(creepsInSpawnRoom, (creep) => creep.memory.role === 'builder').length < targetCreepCounts.builder) {
 		role = 'builder';
+	}
+	else {
+		// console.log('All target creep values reached');
+		return;
 	}
 
 	var newName = role + Game.time;
